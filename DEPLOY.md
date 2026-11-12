@@ -7,16 +7,17 @@ seeded on first start, so the container is effectively stateless and safe to red
 
 | Variable | Default | Notes |
 |---|---|---|
-| `LLM_API_KEY` | — | Empty → deterministic fake model (no network). Set to use a real model. |
-| `LLM_ENDPOINT` | `https://generativelanguage.googleapis.com/v1beta/openai/` | Any OpenAI-compatible endpoint (Gemini default; `https://api.openai.com/v1/` for OpenAI) |
-| `LLM_MODEL` | `gemini-2.5-flash` | Model name at that endpoint |
+| `GROQ_API_KEY` | — | Free key from <https://console.groq.com>; selects Groq's OpenAI-compatible endpoint and `llama-3.3-70b-versatile`. Empty (and no `LLM_API_KEY`) → deterministic fake model. |
+| `LLM_API_KEY` | — | Any other OpenAI-compatible provider; takes precedence over `GROQ_API_KEY` |
+| `LLM_ENDPOINT` | Groq, or Gemini's `.../v1beta/openai/` with `LLM_API_KEY` | Endpoint for `LLM_API_KEY` |
+| `LLM_MODEL` | `llama-3.3-70b-versatile` / `gemini-2.5-flash` | Model name at that endpoint |
 | `SHIFTSENSE_DB` | `shiftsense.db` | SQLite path (`/data/shiftsense.db` in the image) |
 | `SHIFTSENSE_FIXED_NOW` | `true` | Freeze "now" at 2026-11-18 09:00 UTC so the seeded fortnight is always current. `false` = real clock |
 | `SHIFTSENSE_USER` | `E002` | **stdio MCP host only**: the employee the server acts as |
 | `OTEL_CONSOLE` | — | `true` prints OpenTelemetry spans (agent runs, model calls, tool calls) to the console |
 | `PORT` | `8080` | Set by Render; the entrypoint binds `http://+:$PORT` |
 
-Get a free Gemini key at <https://aistudio.google.com> → *Get API key*. Never commit it.
+Get a free Groq key at <https://console.groq.com> → *API Keys*. Never commit it.
 
 ## 2. Render (free tier)
 
@@ -25,7 +26,7 @@ Get a free Gemini key at <https://aistudio.google.com> → *Get API key*. Never 
 1. Push the repo to GitHub.
 2. Render → **New → Blueprint** → pick the repo. It proposes one Docker web service `shiftsense`
    (free plan, Singapore; change `region` if you like).
-3. Paste `LLM_API_KEY` when prompted, or leave it empty to run the fake model.
+3. Paste `GROQ_API_KEY` when prompted, or leave it empty to run the fake model.
 4. **Apply**. First build ≈ 3 minutes (SDK image restore + two publishes).
 5. Open the URL: the chat UI is at `/`, `/health` shows provider/model/tools, MCP is at `/mcp`.
 
@@ -36,7 +37,7 @@ ephemeral — the DB is reseeded on each boot, which is what you want for a demo
 
 ```bash
 docker build -t shiftsense .
-docker run --rm -p 8080:8080 -e LLM_API_KEY=... shiftsense
+docker run --rm -p 8080:8080 -e GROQ_API_KEY=... shiftsense
 # fake model:
 docker run --rm -p 8080:8080 shiftsense
 ```
@@ -121,7 +122,7 @@ the API uses; nothing below the host changes.
 ## 6. Running the eval against a real model
 
 ```bash
-LLM_API_KEY=... dotnet run --project eval/ShiftSense.Eval
+GROQ_API_KEY=... dotnet run --project eval/ShiftSense.Eval
 ```
 
 Writes `eval/results/results_llm.md` with tool-selection accuracy and task success per category.

@@ -89,14 +89,15 @@ dotnet run --project src/ShiftSense.Api       # http://localhost:5xxx — chat U
 dotnet run --project eval/ShiftSense.Eval     # 30-scenario eval, writes eval/results/
 ```
 
-Without `LLM_API_KEY` the agent runs on the deterministic fake model (keyword rules), which is
-enough to exercise every path. For a real model:
+Without a key the agent runs on the deterministic fake model (keyword rules), which is enough to
+exercise every path. For a real model the free default is **Groq**:
 
 ```
-LLM_API_KEY=...                                   # free Gemini key from https://aistudio.google.com
-LLM_ENDPOINT=https://generativelanguage.googleapis.com/v1beta/openai/   # default
-LLM_MODEL=gemini-2.5-flash                        # default
+GROQ_API_KEY=gsk_...          # free key from https://console.groq.com → llama-3.3-70b-versatile (tool calling)
 ```
+
+Any other OpenAI-compatible endpoint works via `LLM_API_KEY` + `LLM_ENDPOINT` + `LLM_MODEL`
+(e.g. Gemini's `https://generativelanguage.googleapis.com/v1beta/openai/` with `gemini-2.5-flash`).
 
 The demo clock is frozen at **Wed 2026-11-18 09:00** so every conversation sees the same roster
 (`SHIFTSENSE_FIXED_NOW=false` for the real clock). Docker: `docker build -t shiftsense . && docker run -p 8080:8080 shiftsense`.
@@ -185,7 +186,7 @@ section.
 
 ### Scenario eval — real model
 
-*Not yet run.* Will be filled in from `LLM_API_KEY=... dotnet run --project eval/ShiftSense.Eval`;
+*Not yet run.* Will be filled in from `GROQ_API_KEY=... dotnet run --project eval/ShiftSense.Eval`;
 no numbers will be written here that did not come from that command.
 
 ## AI-assisted development

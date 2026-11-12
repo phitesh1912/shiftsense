@@ -8,11 +8,8 @@ services:
     healthCheckPath: /health
     autoDeploy: true
     envVars:
-      - key: LLM_ENDPOINT
-        value: https://generativelanguage.googleapis.com/v1beta/openai/
-      - key: LLM_MODEL
-        value: gemini-2.5-flash
-      - key: LLM_API_KEY
-        sync: false # set in the Render dashboard; never commit it. Leave empty to run the fake model.
+      - key: GROQ_API_KEY
+        sync: false # free key from console.groq.com; set in the Render dashboard. Empty = fake model.
+      # Any OpenAI-compatible endpoint instead of Groq: set LLM_API_KEY (+ LLM_ENDPOINT, LLM_MODEL).
       - key: SHIFTSENSE_FIXED_NOW
         value: "true"
