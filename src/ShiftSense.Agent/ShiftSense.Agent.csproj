@@ -10,6 +10,7 @@
     <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.28.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.34" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="11.0.0" />
+    <PackageReference Include="ModelContextProtocol.Core" Version="2.4.0" />
   </ItemGroup>
 
   <PropertyGroup>
