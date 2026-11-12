@@ -14,7 +14,8 @@ public sealed record LlmOptions(string Provider, string Endpoint, string Model, 
 {
     public const string GeminiOpenAIEndpoint = "https://generativelanguage.googleapis.com/v1beta/openai/";
     public const string GroqEndpoint = "https://api.groq.com/openai/v1";
-    public const string GroqDefaultModel = "llama-3.3-70b-versatile";
+    // Groq retired its Llama 3.x endpoints in 2026; gpt-oss-120b supports tool calling well.
+    public const string GroqDefaultModel = "openai/gpt-oss-120b";
 
     public static LlmOptions FromConfiguration(IConfiguration config)
     {

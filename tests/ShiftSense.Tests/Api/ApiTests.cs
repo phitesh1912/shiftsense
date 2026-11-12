@@ -12,10 +12,19 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
     {
+        // Program.cs reads these during service registration (builder.Configuration), which runs
+        // before ConfigureAppConfiguration callbacks are applied for minimal-hosting apps, so they
+        // must go in as host settings. (Regression: the DB path was silently ignored and tests
+        // shared a persistent bin/shiftsense.db across runs.)
+        builder.UseSetting("SHIFTSENSE_DB", _dbPath);
+        // Tests must run on the fake model even on a machine where a real key is set.
+        builder.UseSetting("LLM_API_KEY", "");
+        builder.UseSetting("GROQ_API_KEY", "");
         builder.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["SHIFTSENSE_DB"] = _dbPath,
-            ["LLM_API_KEY"] = null,
+            ["LLM_API_KEY"] = "",
+            ["GROQ_API_KEY"] = "",
         }));
     }
 
@@ -131,9 +140,12 @@ public class ApiTests : IClassFixture<ApiFactory>
         var resp = await emp.PostAsJsonAsync("/chat", new { message = "what is my leave balance?" });
         resp.EnsureSuccessStatusCode();
         var reply = await resp.Content.ReadFromJsonAsync<JsonElement>();
-        var result = JsonDocument.Parse(reply.GetProperty("toolCalls")[0].GetProperty("resultJson").GetString()!).RootElement;
-        return result.GetProperty("balances").EnumerateArray()
+        var raw = reply.GetProperty("toolCalls")[0].GetProperty("resultJson").GetString()!;
+        var result = JsonDocument.Parse(raw).RootElement;
+        var days = result.GetProperty("balances").EnumerateArray()
             .Single(b => b.GetProperty("type").GetString() == type)
             .GetProperty("days").GetDecimal();
+        Assert.True(days >= 1, $"implausible {type} balance {days}; reply={reply.GetRawText()}");
+        return days;
     }
 }

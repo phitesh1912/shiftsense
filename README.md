@@ -93,7 +93,7 @@ Without a key the agent runs on the deterministic fake model (keyword rules), wh
 exercise every path. For a real model the free default is **Groq**:
 
 ```
-GROQ_API_KEY=gsk_...          # free key from https://console.groq.com → llama-3.3-70b-versatile (tool calling)
+GROQ_API_KEY=gsk_...          # free key from https://console.groq.com → openai/gpt-oss-120b (tool calling)
 ```
 
 Any other OpenAI-compatible endpoint works via `LLM_API_KEY` + `LLM_ENDPOINT` + `LLM_MODEL`
@@ -184,22 +184,54 @@ re-validation, refusals — behaves exactly as specified for every scenario. It 
 real model's ability to choose tools from natural language. That number comes from the next
 section.
 
-### Scenario eval — real model
+### Scenario eval — real model (Groq `openai/gpt-oss-120b`)
 
-*Not yet run.* Will be filled in from `GROQ_API_KEY=... dotnet run --project eval/ShiftSense.Eval`;
-no numbers will be written here that did not come from that command.
+Two runs on 2026-11-12 with `GROQ_API_KEY=... dotnet run --project eval/ShiftSense.Eval`
+(paced to the free tier's tokens-per-minute cap). Run 1 is the first prompt; run 2 is after the
+two rules the misses justified. Both result files are kept.
+
+| run | tool-selection accuracy | task success | avg latency / tokens | file |
+|---|---|---|---|---|
+| 1 — initial prompt | 70% (21/30) | 80% (24/30) | 4.5 s · 2276 in / 240 out | `eval/results/results_llm_run1.md` |
+| 2 — after prompt fixes | **93.3% (28/30)** | **96.7% (29/30)** | 7.8 s · 2524 in / 245 out | `eval/results/results_llm.md` |
+
+Per category in run 2: authz 6/6, injection 4/4, manager 4/4, read 6/6, swap 2/2, general 1/1;
+validation 3/4; write 2/3 on tool selection (3/3 on outcome).
+
+**What run 1 taught, and what changed.** The misses fell into three groups:
+
+1. *An unasked-for write.* "Find someone to swap my shift with" led the model to call
+   `find_swap_candidates` and then `request_shift_swap`, creating a PENDING request nobody asked
+   for. The approval gate contained it — nothing changed without a manager — but the prompt had
+   no rule against it. **Rule added:** write tools only on an explicit request.
+2. *Pre-judging validity.* For "casual leave" as a US employee, a weekend-only date range, and a
+   self-swap, the model declined without calling the tool. Safe, but the tool is the source of
+   truth and its message is what the user should see. **Rule added:** don't pre-judge policy;
+   call the tool and relay its validation.
+3. *Reasonable extra reads* (balance before a leave request, candidates before a swap) and
+   *refusing another employee's data without calling the tool* — both sensible behaviours that the
+   strict set-equality rubric scores as misses. Left as is; the rubric stays strict so the number
+   can't be flattered.
+
+Run 2's two remaining misses are both from group 3 and group 2 (one extra read; one weekend
+request still pre-judged). Real-model behaviour on the security-relevant categories —
+authorization, injection, manager scope — was 100% in both runs, and in every refused case the
+tool's `not_authorized` row is in the audit log.
 
 ## AI-assisted development
 
 Built with Claude Code doing most of the typing and me directing, reviewing and testing. The JD
 asks for the ability to *understand and validate AI-generated outputs*; `BUILD_NOTES.md` is the
-log of what that looked like here. The three that mattered:
+log of what that looked like here. The six that mattered:
 
 | # | Bug in generated code | How it was caught | Fix |
 |---|---|---|---|
 | 1 | Seed roster gave everyone 5×8h in a fixed slot, so every US employee sat at the 40h cap and no swap was ever possible (49/212 shifts had a candidate) | Corpus-level tests over the seed data, not the toy fixtures | 4 shifts/week; the rest-gap rule that also blocked swaps was *correct* and kept |
 | 2 | A test fixture meant to isolate the weekly-cap rule tripped the 11h-rest rule instead | The "relaxed cap" half of the test failed | Move fixture shifts so only the rule under test can fire |
 | 3 | OpenTelemetry 1.21 pulled `DiagnosticSource` 11, whose init-only setter broke both `Microsoft.Extensions.AI` *and* the MCP SDK at runtime (`MissingMethodException`) — three wrong guesses before measuring which assembly actually loaded and who pulled it in | Agent tests on the real `ChatClientAgent`; then MCP `initialize` hanging; `dotnet nuget why` | Pin OpenTelemetry 1.20.1; documented the chain |
+| 4 | The API test host's `SHIFTSENSE_DB` override was silently ignored (applied too late for minimal hosting), so every test run approved leave against the same `bin/shiftsense.db` until E005's balance hit 0 | The approval-flow test failed only after enough runs drained the balance | Pass overrides as host settings; assert the balance is plausible |
+| 5 | Seed balances were seeded from `string.GetHashCode()`, which .NET randomises per process — the "deterministic" seed drifted between runs | Found while chasing #4 | Stable numeric seed; determinism test now covers balances |
+| 6 | With a real model, the agent submitted a swap request the user hadn't asked for | Scenario eval run 1 (`sw-02`) | Prompt rule: write tools only on explicit request; run 2 above |
 
 Things I did *not* accept: eval numbers that weren't produced by the eval runner; a "fix" that
 routed around the DiagnosticSource symptom (it resurfaced in MCP within the hour); analyzer

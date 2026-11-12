@@ -37,6 +37,11 @@ public class SeedDataTests
         var again = SeedData.Employees();
         Assert.Equal(Emps.Select(e => (e.Id, e.Name, e.HourlyRate)), again.Select(e => (e.Id, e.Name, e.HourlyRate)));
         Assert.Equal(Shifts.Select(s => s.ToString()), SeedData.Shifts(again).Select(s => s.ToString()));
+        // Balances must not depend on per-process string hashing (regression: they did).
+        var b1 = SeedData.LeaveBalances(Emps).Select(b => (b.EmployeeId, b.Type, b.Days, b.UsedThisYear));
+        var b2 = SeedData.LeaveBalances(again).Select(b => (b.EmployeeId, b.Type, b.Days, b.UsedThisYear));
+        Assert.Equal(b1, b2);
+        Assert.All(SeedData.LeaveBalances(Emps).Where(b => b.Type == LeaveType.Annual), b => Assert.True(b.Days >= 3));
     }
 
     [Fact]

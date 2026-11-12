@@ -56,3 +56,43 @@ findings go here.
   not sufficient — transitive *runtime* compatibility needs an executed path, and when a fix
   "works" by routing around a symptom, the same cause will resurface elsewhere. Measure (which
   assembly loaded, who pulled it in) before the next guess.
+
+## 4. Test host silently ignored the database override and shared a DB across runs (2026-11-12)
+
+- **Where:** `tests/ShiftSense.Tests/Api/ApiTests.cs`, `ApiFactory.ConfigureWebHost`.
+- **Symptom:** `Full_approval_flow` started failing with E005's annual balance at 0 and
+  `usedThisYear` 14 — numbers no fresh seed can produce. The factory set `SHIFTSENSE_DB` via
+  `ConfigureAppConfiguration`, but `Program.cs` reads it during service registration from
+  `builder.Configuration`, before those callbacks apply to a minimal-hosting app. Every test run
+  had been approving leave against the same `bin/.../shiftsense.db`, deducting 2 days each time,
+  until the balance ran out.
+- **Fix:** pass the overrides as host settings (`builder.UseSetting`), which are present when
+  `WebApplication.CreateBuilder` runs; assert that a balance is plausible before using it.
+- **Tests:** `ApiTests.Full_approval_flow_employee_requests_manager_approves` now also fails
+  loudly (with the raw payload) if the DB is ever stale again.
+- **Lesson:** a test that passes for the wrong reason (fresh DB by luck) hides config bugs; the
+  failure only surfaced once enough runs had drained the balance.
+
+## 5. Seed balances depended on per-process string hashing (2026-11-12)
+
+- **Where:** `SeedData.BalancesFor` seeded its RNG with `employee.Id.GetHashCode()`.
+- **Symptom:** found while investigating #4: .NET Core randomises `string.GetHashCode` per
+  process, so leave balances differed between runs (E005: 22 in one process, 23 in the next) —
+  the "deterministic seed" wasn't, and the eval's expected outcomes could drift.
+- **Fix:** seed from the numeric part of the id; `Seed_is_deterministic` now covers balances.
+- **Lesson:** "deterministic" needs a test that compares two independent generations, and
+  hash codes are never a stable seed.
+
+## 6. Real-model eval: the agent submitted a request nobody asked for (2026-11-12)
+
+- **Where:** system prompt in `ShiftSenseAgent.Instructions`; scenario `sw-02`.
+- **Symptom:** asked *"Find someone to swap my shift S0xxx with"*, gpt-oss-120b called
+  `find_swap_candidates` and then `request_shift_swap` — creating a PENDING request the user had
+  not requested. The approval gate contained it (nothing changed without a manager), which is the
+  point of the gate, but the prompt had no rule against unasked-for writes. Three other misses were
+  the model pre-judging validity (US has no casual leave, weekend dates, self-swap) and declining
+  without calling the tool.
+- **Fix:** two prompt rules: write tools only on an explicit request; don't pre-judge policy, let
+  the tool validate. Run 1 is kept as `eval/results/results_llm_run1.md`; run 2 after the change
+  is `results_llm.md`.
+- **Lesson:** the eval is where prompt rules come from. Not from imagination, from misses.

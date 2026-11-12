@@ -32,7 +32,12 @@ public static class ChatClientFactory
         {
             var client = new OpenAIClient(
                 new ApiKeyCredential(options.ApiKey!),
-                new OpenAIClientOptions { Endpoint = new Uri(options.Endpoint) });
+                new OpenAIClientOptions
+                {
+                    Endpoint = new Uri(options.Endpoint),
+                    // Free tiers rate-limit by tokens/minute; retries honour Retry-After.
+                    RetryPolicy = new System.ClientModel.Primitives.ClientRetryPolicy(maxRetries: 8),
+                });
             inner = client.GetChatClient(options.Model).AsIChatClient();
         }
         return inner.AsBuilder()

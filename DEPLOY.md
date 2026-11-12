@@ -7,10 +7,11 @@ seeded on first start, so the container is effectively stateless and safe to red
 
 | Variable | Default | Notes |
 |---|---|---|
-| `GROQ_API_KEY` | — | Free key from <https://console.groq.com>; selects Groq's OpenAI-compatible endpoint and `llama-3.3-70b-versatile`. Empty (and no `LLM_API_KEY`) → deterministic fake model. |
+| `GROQ_API_KEY` | — | Free key from <https://console.groq.com>; selects Groq's OpenAI-compatible endpoint and `openai/gpt-oss-120b`. Empty (and no `LLM_API_KEY`) → deterministic fake model. |
 | `LLM_API_KEY` | — | Any other OpenAI-compatible provider; takes precedence over `GROQ_API_KEY` |
 | `LLM_ENDPOINT` | Groq, or Gemini's `.../v1beta/openai/` with `LLM_API_KEY` | Endpoint for `LLM_API_KEY` |
-| `LLM_MODEL` | `llama-3.3-70b-versatile` / `gemini-2.5-flash` | Model name at that endpoint |
+| `LLM_MODEL` | `openai/gpt-oss-120b` / `gemini-2.5-flash` | Model name at that endpoint |
+| `EVAL_PACE_SECONDS` | `10` | Eval runner only: delay between scenarios with a real model (free tiers cap tokens/minute) |
 | `SHIFTSENSE_DB` | `shiftsense.db` | SQLite path (`/data/shiftsense.db` in the image) |
 | `SHIFTSENSE_FIXED_NOW` | `true` | Freeze "now" at 2026-11-18 09:00 UTC so the seeded fortnight is always current. `false` = real clock |
 | `SHIFTSENSE_USER` | `E002` | **stdio MCP host only**: the employee the server acts as |

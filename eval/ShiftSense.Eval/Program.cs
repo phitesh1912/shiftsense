@@ -41,9 +41,17 @@ using (var scope = services.CreateScope())
     roster = await scope.ServiceProvider.GetRequiredService<ShiftSenseStore>().LoadRosterAsync();
 }
 
+// Free-tier endpoints cap tokens per minute; space real-model calls out (EVAL_PACE_SECONDS).
+var pace = TimeSpan.FromSeconds(llm.IsFake ? 0 : double.Parse(config["EVAL_PACE_SECONDS"] ?? "10", CultureInfo.InvariantCulture));
+Console.WriteLine($"provider={llm.Provider} model={llm.Model} pace={pace.TotalSeconds}s");
+
 var rows = new List<Row>();
 foreach (var s in scenarios)
 {
+    if (pace > TimeSpan.Zero && rows.Count > 0)
+    {
+        await Task.Delay(pace);
+    }
     var (message, skipReason) = Resolve(s.Message, roster);
     if (skipReason is not null)
     {

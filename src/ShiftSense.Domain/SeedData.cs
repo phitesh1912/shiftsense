@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace ShiftSense.Domain;
 
 /// <summary>
@@ -210,7 +212,9 @@ public static class SeedData
 
     private static IEnumerable<LeaveBalance> BalancesFor(Employee e)
     {
-        var rng = new Random(e.Id.GetHashCode(StringComparison.Ordinal));
+        // string.GetHashCode is randomised per process in .NET Core, so it must not seed data
+        // that is supposed to be identical across runs; the numeric part of the id is stable.
+        var rng = new Random(1000 + int.Parse(e.Id[1..], CultureInfo.InvariantCulture));
         yield return new LeaveBalance
         {
             EmployeeId = e.Id, Type = LeaveType.Annual,
