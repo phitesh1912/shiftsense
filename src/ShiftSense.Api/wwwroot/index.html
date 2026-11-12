@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ShiftSense</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <div>
+      <h1>ShiftSense</h1>
+      <p class="tagline">Leave, shifts, swaps, overtime and coverage — by tool calls, with a human approving every change.</p>
+    </div>
+    <div class="identity">
+      <label>Acting as
+        <select id="who"></select>
+      </label>
+      <span id="health" class="muted"></span>
+    </div>
+  </header>
+
+  <main>
+    <section class="chat">
+      <div id="messages" class="messages"></div>
+      <form id="form" class="composer">
+        <input id="input" type="text" maxlength="2000" placeholder="e.g. What's my leave balance?  ·  Who can take my shift S0012?  ·  Book sick leave on 2026-11-23" autocomplete="off" />
+        <button id="send" type="submit">Send</button>
+      </form>
+      <div class="samples" id="samples"></div>
+    </section>
+
+    <aside>
+      <section class="panel">
+        <h2>Tool-call trace</h2>
+        <div id="trace" class="trace muted">No calls yet.</div>
+      </section>
+      <section class="panel" id="approvals" hidden>
+        <h2>Approval queue <button id="refresh" class="link">refresh</button></h2>
+        <div id="pending" class="pending"></div>
+      </section>
+      <section class="panel" id="auditPanel" hidden>
+        <h2>Audit log</h2>
+        <div id="audit" class="audit"></div>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="muted">
+    Fictional Acme Retail data. Identity is a demo picker; in production it comes from the auth token.
+    MCP endpoint: <code>/mcp</code> (same <code>X-Employee-Id</code> header).
+  </footer>
+  <script src="app.js"></script>
+</body>
+</html>

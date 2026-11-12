@@ -84,9 +84,10 @@ public class ApiTests : IClassFixture<ApiFactory>
         var emp = _factory.As("E005", "flow");
         var mgr = _factory.As("E001");
 
-        var balanceBefore = await BalanceAsync(emp, "Sick");
+        // Annual: every seed employee has several days; sick balances can be as low as 1.
+        var balanceBefore = await BalanceAsync(emp, "Annual");
 
-        var chat = await emp.PostAsJsonAsync("/chat", new { message = "please book sick leave on 2026-12-07 to 2026-12-08" });
+        var chat = await emp.PostAsJsonAsync("/chat", new { message = "please book annual leave from 2026-12-07 to 2026-12-08" });
         chat.EnsureSuccessStatusCode();
         var reply = await chat.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("request_leave", reply.GetProperty("toolCalls")[0].GetProperty("tool").GetString());
@@ -109,7 +110,7 @@ public class ApiTests : IClassFixture<ApiFactory>
 
         // approving twice is a conflict, and the balance went down by 2 working days
         Assert.Equal(HttpStatusCode.Conflict, (await mgr.PostAsJsonAsync($"/requests/{requestId}/approve", new { })).StatusCode);
-        Assert.Equal(balanceBefore - 2, await BalanceAsync(emp, "Sick"));
+        Assert.Equal(balanceBefore - 2, await BalanceAsync(emp, "Annual"));
 
         // audit is manager-only and contains the decision
         Assert.Equal(HttpStatusCode.Forbidden, (await emp.GetAsync("/audit")).StatusCode);

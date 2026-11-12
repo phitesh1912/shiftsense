@@ -27,25 +27,32 @@ findings go here.
 - **Lesson:** a constraint test must isolate one constraint; the generated fixture tripped a
   neighbouring one.
 
-## 3. `UseOpenTelemetry()` from Microsoft.Extensions.AI crashes at runtime on .NET 8 (2026-11-12)
+## 3. OpenTelemetry 1.21 silently breaks both Microsoft.Extensions.AI and the MCP SDK on .NET 8 (2026-11-12)
 
-- **Where:** `ChatClientFactory.Create` → `chat.AsBuilder().UseOpenTelemetry(...)`.
-- **Symptom:** every agent and API test failed with
-  `MissingMethodException: InstrumentAdvice<T>.set_HistogramBucketBoundaries(IReadOnlyList<T>)`.
-  It compiled cleanly; only running it revealed the problem.
-- **Diagnosis (took three attempts):** first guess was "the runtime's DiagnosticSource 8.0 is
-  loading" — wrong, a diagnostic test showed `System.Diagnostics.DiagnosticSource` **11.0.0.0**
-  was loaded from the app folder (pulled transitively by `OpenTelemetry.*` 1.21). Second guess was
-  "M.E.AI 11.0 vs Agents.AI 1.28 skew" — aligning everything to M.E.AI 10.11.0 (what Agents.AI
-  1.28 declares) didn't help either. The real cause: in DiagnosticSource 11 that property setter
-  became `init`-only (modreq `IsExternalInit`), which changes the method signature, so the
-  net8.0 builds of M.E.AI 10.11 *and* 11.0 (both compiled against DiagnosticSource 10.0.0.0)
-  cannot bind it. A binary break two packages away.
-- **Fix:** don't use `UseOpenTelemetry()`; emit our own spans. The agent already created an
-  `agent.run` span with token counts; each tool call now gets a `tool.<name>` span with
-  authorized/succeeded tags. Same information, no fragile dependency.
-- **Tests:** `ShiftSenseAgentTests.*`, `ApiTests.*` — they run the real `ChatClientAgent` with a
-  fake model, which is exactly why this surfaced in CI instead of in the demo.
+- **Where:** first in `ChatClientFactory.Create` → `UseOpenTelemetry(...)`; later the MCP server
+  itself (`ModelContextProtocol.Diagnostics` static constructor) with the identical error.
+- **Symptom:** `MissingMethodException: InstrumentAdvice<T>.set_HistogramBucketBoundaries(...)`.
+  Every agent test failed; later every MCP `initialize` hung or returned 500. It compiled
+  cleanly; only executing it revealed the problem.
+- **Diagnosis (five steps, three wrong guesses):**
+  1. Guess: the runtime's DiagnosticSource 8.0 wins over the package. Wrong — a throwaway
+     diagnostic test printed the loaded assembly: `System.Diagnostics.DiagnosticSource` 11.0.0.0
+     from the app folder, and its setter carries modreq `IsExternalInit` (init-only).
+  2. Guess: M.E.AI 11.0 vs Microsoft.Agents.AI 1.28 skew. Aligning to M.E.AI 10.11 (what
+     Agents.AI 1.28 declares) changed nothing.
+  3. Workaround: drop `UseOpenTelemetry()` and hand-roll spans. Tests went green — until the MCP
+     server failed the same way, which proved the problem was not M.E.AI-specific.
+  4. `dotnet nuget why` showed the chain: **OpenTelemetry 1.21.0 → Microsoft.Extensions.* 11.0.0
+     → DiagnosticSource 11.0.0**. MCP 2.4.0 and M.E.AI 10.11 themselves only ask for 10.x.
+  5. Root cause: DiagnosticSource 11's net8 asset made that property init-only, changing the
+     setter's signature, so anything compiled against 10.x cannot bind it.
+- **Fix:** pin `OpenTelemetry.Extensions.Hosting` / `OpenTelemetry.Exporter.Console` to 1.20.1
+  (declares DiagnosticSource 10.0.0). The Api now resolves DiagnosticSource 10.0.14 and both
+  `UseOpenTelemetry()` (restored) and the MCP server work. Upgrading OpenTelemetry later requires
+  M.E.AI and MCP builds that target the 11 line.
+- **Tests:** `ShiftSenseAgentTests.*`, `ApiTests.*`, `McpServerTests.*`, plus a Kestrel smoke
+  script that drives `/mcp` with raw JSON-RPC.
 - **Lesson:** "verify package versions against NuGet" (the spec's own warning) is necessary but
-  not sufficient; transitive *runtime* compatibility needs an executed path. Also: when the first
-  fix doesn't work, measure (which assembly actually loaded?) before guessing again.
+  not sufficient — transitive *runtime* compatibility needs an executed path, and when a fix
+  "works" by routing around a symptom, the same cause will resurface elsewhere. Measure (which
+  assembly loaded, who pulled it in) before the next guess.

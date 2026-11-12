@@ -1,23 +1,33 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using ModelContextProtocol.Protocol;
 using OpenTelemetry.Trace;
 using ShiftSense.Agent;
 using ShiftSense.Agent.Llm;
 using ShiftSense.Agent.Persistence;
 using ShiftSense.Agent.Tools;
+using ShiftSense.Api;
 using ShiftSense.Domain;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddShiftSense(builder.Configuration);
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<ICallerAccessor, HttpContextCallerAccessor>();
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase);
 
-// Traces for agent runs and every model call (token usage, latency, tool calls). The console
-// exporter is opt-in so logs stay readable; point OTEL_EXPORTER_OTLP_ENDPOINT at a collector
-// in production.
+// The same tool class the chat agent uses, exposed over MCP (Streamable HTTP) at /mcp.
+builder.Services
+    .AddMcpServer(o => o.ServerInfo = new Implementation { Name = "shiftsense", Version = "1.0.0" })
+    .WithHttpTransport(o => o.Stateless = true)
+    .WithTools<SchedulingTools>();
+
+// Traces for agent runs and tool calls (token usage, latency, authorization outcome). The console
+// exporter is opt-in so logs stay readable; point OTEL_EXPORTER_OTLP_ENDPOINT at a collector in
+// production.
 if (string.Equals(builder.Configuration["OTEL_CONSOLE"], "true", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddOpenTelemetry().WithTracing(t => t
-        .AddSource(ChatClientFactory.ActivitySourceName, "Microsoft.Extensions.AI", "Experimental.Microsoft.Extensions.AI", "*Microsoft.Agents.AI*")
+        .AddSource(ChatClientFactory.ActivitySourceName)
         .AddConsoleExporter());
 }
 
@@ -29,10 +39,11 @@ app.UseStaticFiles();
 
 // --- identity (demo) ---------------------------------------------------------------------------
 // The caller is identified by the X-Employee-Id header. In production this comes from the
-// verified bearer token; everything downstream (CallerContext, tools, approvals) is unchanged.
+// verified bearer token; everything downstream (CallerContext, tools, approvals, MCP) is unchanged.
 
-static async Task<IResult?> ResolveCallerAsync(HttpContext http, ShiftSenseStore store, CallerAccessor accessor, string? conversationId)
+static async Task<IResult?> ResolveCallerAsync(HttpContext http, string? conversationId)
 {
+    var store = http.RequestServices.GetRequiredService<ShiftSenseStore>();
     var id = http.Request.Headers["X-Employee-Id"].FirstOrDefault()?.Trim().ToUpperInvariant();
     if (string.IsNullOrEmpty(id))
     {
@@ -50,12 +61,26 @@ static async Task<IResult?> ResolveCallerAsync(HttpContext http, ShiftSenseStore
     {
         return Results.Problem("conversationId too long", statusCode: StatusCodes.Status400BadRequest);
     }
-    accessor.Current = new CallerContext(emp.Id, emp.Name, emp.Role, emp.Region, emp.TeamId, conv);
+    http.Items[HttpContextCallerAccessor.ItemKey] = new CallerContext(emp.Id, emp.Name, emp.Role, emp.Region, emp.TeamId, conv);
     return null;
 }
 
-static IResult? RequireManager(CallerAccessor accessor) =>
-    accessor.Current.IsManager ? null : Results.Problem("managers only", statusCode: StatusCodes.Status403Forbidden);
+static CallerContext Caller(HttpContext http) => (CallerContext)http.Items[HttpContextCallerAccessor.ItemKey]!;
+
+static IResult? RequireManager(HttpContext http) =>
+    Caller(http).IsManager ? null : Results.Problem("managers only", statusCode: StatusCodes.Status403Forbidden);
+
+// MCP requests carry the same header; resolve before the MCP handler runs.
+app.Use(async (http, next) =>
+{
+    if (http.Request.Path.StartsWithSegments("/mcp") && await ResolveCallerAsync(http, "mcp") is { } fail)
+    {
+        await fail.ExecuteAsync(http);
+        return;
+    }
+    await next(http);
+});
+app.MapMcp("/mcp");
 
 // --- endpoints ---------------------------------------------------------------------------------
 
@@ -67,6 +92,7 @@ app.MapGet("/health", (LlmOptions llm, IClock clock) => Results.Ok(new
     endpoint = llm.IsFake ? null : llm.Endpoint,
     now = clock.UtcNow,
     tools = ToolCatalog.Names,
+    mcp = "/mcp",
 }));
 
 app.MapGet("/employees", async (ShiftSenseStore store) =>
@@ -77,13 +103,13 @@ app.MapGet("/employees", async (ShiftSenseStore store) =>
         .Select(e => new { e.Id, e.Name, Role = e.Role.ToString().ToLowerInvariant(), e.Region, e.TeamId }));
 });
 
-app.MapPost("/chat", async (HttpContext http, ChatRequest req, ShiftSenseStore store, CallerAccessor accessor, ShiftSenseAgent agent) =>
+app.MapPost("/chat", async (HttpContext http, ChatRequest req, ShiftSenseAgent agent) =>
 {
     if (string.IsNullOrWhiteSpace(req.Message) || req.Message.Length > 2000)
     {
         return Results.Problem("message must be 1-2000 characters", statusCode: StatusCodes.Status400BadRequest);
     }
-    if (await ResolveCallerAsync(http, store, accessor, req.ConversationId) is { } fail)
+    if (await ResolveCallerAsync(http, req.ConversationId) is { } fail)
     {
         return fail;
     }
@@ -91,17 +117,17 @@ app.MapPost("/chat", async (HttpContext http, ChatRequest req, ShiftSenseStore s
     return Results.Ok(reply);
 });
 
-app.MapGet("/requests/pending", async (HttpContext http, ShiftSenseStore store, CallerAccessor accessor) =>
+app.MapGet("/requests/pending", async (HttpContext http, ShiftSenseStore store) =>
 {
-    if (await ResolveCallerAsync(http, store, accessor, null) is { } fail)
+    if (await ResolveCallerAsync(http, null) is { } fail)
     {
         return fail;
     }
-    if (RequireManager(accessor) is { } forbidden)
+    if (RequireManager(http) is { } forbidden)
     {
         return forbidden;
     }
-    var me = accessor.Current;
+    var me = Caller(http);
     var pending = await store.GetPendingAsync(http.RequestAborted);
     var leave = new List<object>();
     foreach (var l in pending.Leave)
@@ -126,17 +152,17 @@ app.MapGet("/requests/pending", async (HttpContext http, ShiftSenseStore store, 
     return Results.Ok(new { leave, swaps });
 });
 
-async Task<IResult> DecideAsync(HttpContext http, string id, bool approve, DecisionRequest? body, ShiftSenseStore store, CallerAccessor accessor, IClock clock)
+async Task<IResult> DecideAsync(HttpContext http, string id, bool approve, DecisionRequest? body, ShiftSenseStore store, IClock clock)
 {
-    if (await ResolveCallerAsync(http, store, accessor, null) is { } fail)
+    if (await ResolveCallerAsync(http, null) is { } fail)
     {
         return fail;
     }
-    if (RequireManager(accessor) is { } forbidden)
+    if (RequireManager(http) is { } forbidden)
     {
         return forbidden;
     }
-    var me = accessor.Current;
+    var me = Caller(http);
     id = id.Trim().ToUpperInvariant();
     string requesterId;
     if (id.StartsWith("LR-", StringComparison.Ordinal))
@@ -189,18 +215,18 @@ async Task<IResult> DecideAsync(HttpContext http, string id, bool approve, Decis
     return decision.Applied ? Results.Ok(new { id, decision.Message }) : Results.Conflict(new { id, decision.Message });
 }
 
-app.MapPost("/requests/{id}/approve", (HttpContext http, string id, DecisionRequest? body, ShiftSenseStore store, CallerAccessor accessor, IClock clock) =>
-    DecideAsync(http, id, true, body, store, accessor, clock));
-app.MapPost("/requests/{id}/reject", (HttpContext http, string id, DecisionRequest? body, ShiftSenseStore store, CallerAccessor accessor, IClock clock) =>
-    DecideAsync(http, id, false, body, store, accessor, clock));
+app.MapPost("/requests/{id}/approve", (HttpContext http, string id, DecisionRequest? body, ShiftSenseStore store, IClock clock) =>
+    DecideAsync(http, id, true, body, store, clock));
+app.MapPost("/requests/{id}/reject", (HttpContext http, string id, DecisionRequest? body, ShiftSenseStore store, IClock clock) =>
+    DecideAsync(http, id, false, body, store, clock));
 
-app.MapGet("/audit", async (HttpContext http, [FromQuery] int? take, ShiftSenseStore store, CallerAccessor accessor) =>
+app.MapGet("/audit", async (HttpContext http, [FromQuery] int? take, ShiftSenseStore store) =>
 {
-    if (await ResolveCallerAsync(http, store, accessor, null) is { } fail)
+    if (await ResolveCallerAsync(http, null) is { } fail)
     {
         return fail;
     }
-    if (RequireManager(accessor) is { } forbidden)
+    if (RequireManager(http) is { } forbidden)
     {
         return forbidden;
     }

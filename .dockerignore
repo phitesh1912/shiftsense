@@ -1,0 +1,12 @@
+.git
+.vs
+.vscode
+**/bin
+**/obj
+eval/results
+*.db
+*.db-*
+README.md
+INTERVIEW_PREP.md
+DEPLOY.md
+BUILD_NOTES.md

@@ -482,3 +482,8 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# eval + local scratch
+eval/results/*.json
+smoke.db*
+out/

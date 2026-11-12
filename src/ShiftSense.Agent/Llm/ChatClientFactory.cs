@@ -15,23 +15,28 @@ public static class ChatClientFactory
     /// deterministic fake is used.
     /// </summary>
     /// <remarks>
-    /// Tracing is done at the agent layer (<see cref="ShiftSenseAgent"/> emits an <c>agent.run</c>
-    /// span with token usage, and every tool call gets a <c>tool.*</c> span) rather than with
-    /// <c>UseOpenTelemetry()</c>: on .NET 8 the M.E.AI 10.x/11.0 instrumentation binds to a
-    /// <c>DiagnosticSource</c> 10 setter that became init-only in <c>DiagnosticSource</c> 11, which
-    /// OpenTelemetry 1.21 pulls in. See BUILD_NOTES.md #3.
+    /// Both are wrapped with M.E.AI's OpenTelemetry instrumentation (GenAI semantic-convention
+    /// spans with token usage per model call); the agent adds an <c>agent.run</c> span and every
+    /// tool call a <c>tool.*</c> span. Note the package pins in the csproj: OpenTelemetry must stay
+    /// on a release that depends on <c>DiagnosticSource</c> 10.x — see BUILD_NOTES.md #3.
     /// </remarks>
     public static IChatClient Create(LlmOptions options, ILoggerFactory? loggerFactory = null)
     {
         ArgumentNullException.ThrowIfNull(options);
+        IChatClient inner;
         if (options.IsFake)
         {
-            return new FakeChatClient();
+            inner = new FakeChatClient();
         }
-        var client = new OpenAIClient(
-            new ApiKeyCredential(options.ApiKey!),
-            new OpenAIClientOptions { Endpoint = new Uri(options.Endpoint) });
-        IChatClient chat = client.GetChatClient(options.Model).AsIChatClient();
-        return loggerFactory is null ? chat : chat.AsBuilder().UseLogging(loggerFactory).Build();
+        else
+        {
+            var client = new OpenAIClient(
+                new ApiKeyCredential(options.ApiKey!),
+                new OpenAIClientOptions { Endpoint = new Uri(options.Endpoint) });
+            inner = client.GetChatClient(options.Model).AsIChatClient();
+        }
+        return inner.AsBuilder()
+            .UseOpenTelemetry(loggerFactory, ActivitySourceName)
+            .Build();
     }
 }
