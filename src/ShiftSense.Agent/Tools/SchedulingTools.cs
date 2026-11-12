@@ -298,25 +298,19 @@ public sealed class SchedulingTools(ShiftSenseStore store, ICallerAccessor calle
         }
     }
 
-    private async Task<bool> ManagesAsync(string managerId, Employee target, CancellationToken ct)
-    {
-        var cursor = target;
-        for (var depth = 0; depth < 16 && cursor.ManagerId is not null; depth++)
-        {
-            if (cursor.ManagerId == managerId)
-            {
-                return true;
-            }
-            cursor = await store.GetEmployeeAsync(cursor.ManagerId, ct) ?? throw new ToolValidationException("broken reporting chain");
-        }
-        return false;
-    }
+    private Task<bool> ManagesAsync(string managerId, Employee target, CancellationToken ct) =>
+        ReportingLine.ManagesAsync(store, managerId, target, ct);
 
     // --- audit wrapper ------------------------------------------------------------------------
+
+    private static readonly ActivitySource Tracing = new("ShiftSense.Agent");
 
     private async Task<object> AuditedAsync(string tool, object args, Func<Task<object>> body, CancellationToken ct)
     {
         var me = caller.Current;
+        using var span = Tracing.StartActivity($"tool.{tool}");
+        span?.SetTag("shiftsense.tool", tool);
+        span?.SetTag("shiftsense.employee", me.EmployeeId);
         var sw = Stopwatch.StartNew();
         var authorized = true;
         var succeeded = false;
@@ -342,6 +336,8 @@ public sealed class SchedulingTools(ShiftSenseStore store, ICallerAccessor calle
         finally
         {
             sw.Stop();
+            span?.SetTag("shiftsense.authorized", authorized);
+            span?.SetTag("shiftsense.succeeded", succeeded);
             await store.AddAuditAsync(new AuditEntry
             {
                 Timestamp = clock.UtcNow,

@@ -82,6 +82,12 @@ public sealed class ShiftSenseStore(ShiftSenseDbContext db, IClock clock)
         return new PendingRequests(leave, swaps);
     }
 
+    public Task<LeaveRequest?> GetLeaveRequestAsync(string id, CancellationToken ct = default) =>
+        db.LeaveRequests.AsNoTracking().FirstOrDefaultAsync(l => l.Id == id, ct);
+
+    public Task<SwapRequest?> GetSwapRequestAsync(string id, CancellationToken ct = default) =>
+        db.SwapRequests.AsNoTracking().FirstOrDefaultAsync(s => s.Id == id, ct);
+
     public Task<List<LeaveRequest>> GetLeaveRequestsAsync(string employeeId, CancellationToken ct = default) =>
         db.LeaveRequests.AsNoTracking().Where(l => l.EmployeeId == employeeId).OrderByDescending(l => l.CreatedAt).ToListAsync(ct);
 
