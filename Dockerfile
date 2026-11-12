@@ -12,10 +12,11 @@ ENV SHIFTSENSE_DB=/data/shiftsense.db \
     DOTNET_EnableDiagnostics=0
 COPY --from=build /app/api ./api
 COPY --from=build /app/mcp ./mcp
-RUN useradd --uid 10001 --create-home app && mkdir -p /data && chown -R app:app /data /app
+# The aspnet base image already defines a non-root 'app' user (uid 1654); reuse it.
+RUN mkdir -p /data && chown -R app:app /data /app
 USER app
 EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
-    CMD curl -fsS "http://127.0.0.1:${PORT:-8080}/health" || exit 1
+# No HEALTHCHECK instruction: the base image has no curl/wget, and the platform (Render) probes
+# GET /health itself — see render.yaml.
 # Render (and most PaaS) inject PORT; default to 8080 locally.
 ENTRYPOINT ["sh", "-c", "ASPNETCORE_URLS=http://+:${PORT:-8080} exec dotnet api/ShiftSense.Api.dll"]
