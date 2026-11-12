@@ -1,0 +1,64 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{DEA77317-2F5B-4231-AC64-E695C883BA58}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShiftSense.Agent", "src\ShiftSense.Agent\ShiftSense.Agent.csproj", "{CFAAA659-02C0-4634-AD47-685F5D6448EB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShiftSense.Api", "src\ShiftSense.Api\ShiftSense.Api.csproj", "{948AF008-082A-4339-A6EC-8B02A255F984}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShiftSense.Domain", "src\ShiftSense.Domain\ShiftSense.Domain.csproj", "{3DF7A9CF-B2FE-49E2-B4F4-0C16D1F2C414}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShiftSense.Mcp", "src\ShiftSense.Mcp\ShiftSense.Mcp.csproj", "{26448962-4ECE-4587-A491-21D4F24D8D35}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShiftSense.Scheduling", "src\ShiftSense.Scheduling\ShiftSense.Scheduling.csproj", "{18000531-FEC3-4FC9-B9E3-647CE36C68DC}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{3B5697AD-1A77-4D6D-8EBF-591AB5EE9E68}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShiftSense.Tests", "tests\ShiftSense.Tests\ShiftSense.Tests.csproj", "{765798AF-EF44-4D22-8C05-3905B13AA364}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CFAAA659-02C0-4634-AD47-685F5D6448EB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CFAAA659-02C0-4634-AD47-685F5D6448EB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CFAAA659-02C0-4634-AD47-685F5D6448EB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CFAAA659-02C0-4634-AD47-685F5D6448EB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{948AF008-082A-4339-A6EC-8B02A255F984}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{948AF008-082A-4339-A6EC-8B02A255F984}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{948AF008-082A-4339-A6EC-8B02A255F984}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{948AF008-082A-4339-A6EC-8B02A255F984}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3DF7A9CF-B2FE-49E2-B4F4-0C16D1F2C414}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3DF7A9CF-B2FE-49E2-B4F4-0C16D1F2C414}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3DF7A9CF-B2FE-49E2-B4F4-0C16D1F2C414}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3DF7A9CF-B2FE-49E2-B4F4-0C16D1F2C414}.Release|Any CPU.Build.0 = Release|Any CPU
+		{26448962-4ECE-4587-A491-21D4F24D8D35}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{26448962-4ECE-4587-A491-21D4F24D8D35}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{26448962-4ECE-4587-A491-21D4F24D8D35}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{26448962-4ECE-4587-A491-21D4F24D8D35}.Release|Any CPU.Build.0 = Release|Any CPU
+		{18000531-FEC3-4FC9-B9E3-647CE36C68DC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{18000531-FEC3-4FC9-B9E3-647CE36C68DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{18000531-FEC3-4FC9-B9E3-647CE36C68DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{18000531-FEC3-4FC9-B9E3-647CE36C68DC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{765798AF-EF44-4D22-8C05-3905B13AA364}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{765798AF-EF44-4D22-8C05-3905B13AA364}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{765798AF-EF44-4D22-8C05-3905B13AA364}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{765798AF-EF44-4D22-8C05-3905B13AA364}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{CFAAA659-02C0-4634-AD47-685F5D6448EB} = {DEA77317-2F5B-4231-AC64-E695C883BA58}
+		{948AF008-082A-4339-A6EC-8B02A255F984} = {DEA77317-2F5B-4231-AC64-E695C883BA58}
+		{3DF7A9CF-B2FE-49E2-B4F4-0C16D1F2C414} = {DEA77317-2F5B-4231-AC64-E695C883BA58}
+		{26448962-4ECE-4587-A491-21D4F24D8D35} = {DEA77317-2F5B-4231-AC64-E695C883BA58}
+		{18000531-FEC3-4FC9-B9E3-647CE36C68DC} = {DEA77317-2F5B-4231-AC64-E695C883BA58}
+		{765798AF-EF44-4D22-8C05-3905B13AA364} = {3B5697AD-1A77-4D6D-8EBF-591AB5EE9E68}
+	EndGlobalSection
+EndGlobal
